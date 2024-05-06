@@ -1,3 +1,44 @@
+
 {
-    "cmake.sourceDirectory": "C:/Users/trol_/OneDrive/Documentos/PlatformIO/Projects/temperaturadht11"
+    "cmake.sourceDirectory": "C:/Users/trol_/OneDrive/Documentos/PlatformIO/Projects/temperaturadht11",    
+    "mssql.maxRecentConnections": 5,
+    "mssql.connections":[],
+    "mssql.shortcuts": {
+        "event.toggleResultPane": "ctrl+alt+r",
+        "event.toggleMessagePane": "ctrl+alt+y",
+        "event.prevGrid": "ctrl+up",
+        "event.nextGrid": "ctrl+down",
+        "event.copySelection": "ctrl+c",
+        "event.maximizeGrid": "",
+        "event.selectAll": "",
+        "event.saveAsJSON": "",
+        "event.saveAsCSV": "",
+        "event.saveAsExcel": ""
+    },
+    "mssql.messagesDefaultOpen": true,
+    "mssql.logDebugInfo": false,
+    "mssql.saveAsCsv.includeHeaders": true,
+    "mssql.saveAsCsv.delimiter": ",",
+    "mssql.saveAsCsv.lineSeparator": "null",
+    "mssql.saveAsCsv.textIdentifier": "\"",
+    "mssql.saveAsCsv.encoding": "utf-8",
+    "mssql.intelliSense.enableIntelliSense": true,
+    "mssql.intelliSense.enableErrorChecking": true,
+    "mssql.intelliSense.enableSuggestions": true,
+    "mssql.intelliSense.enableQuickInfo": true,
+    "mssql.intelliSense.lowerCaseSuggestions": false,
+    "mssql.resultsFontFamily": "-apple-system,BlinkMacSystemFont,Segoe WPC,Segoe UI,HelveticaNeue-Light,Ubuntu,Droid Sans,sans-serif",
+    "mssql.resultsFontSize": 13,
+    "mssql.copyIncludeHeaders": false,
+    "mssql.copyRemoveNewLine" : true,
+    "mssql.splitPaneSelection": "next",
+    "mssql.format.alignColumnDefinitionsInColumns": false,
+    "mssql.format.datatypeCasing": "none",
+    "mssql.format.keywordCasing": "none",
+    "mssql.format.placeCommasBeforeNextStatement": false,
+    "mssql.format.placeSelectStatementReferencesOnNewLine": false,
+    "mssql.applyLocalization": false,
+    "mssql.query.displayBitAsNumber": true,
+    "mssql.persistQueryResultTabs": false
+    
 }
