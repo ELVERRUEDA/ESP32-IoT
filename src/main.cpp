@@ -12,27 +12,67 @@
 
 #define DHTPIN 14
 #define DHTTYPE DHT11
+#define RELAY_PIN 26
 
 const char* ssid = "no vives de ensalada";
 const char* pass = "sisas420";
 const char* mqtt_server = "40.85.182.68";
 int mqtt_port = 1883;
-const char* mqtt_topic = "esp32/dht11";
+const char* mqtt_topic_temp = "esp32/dht11/temperature";
+const char* mqtt_topic_hum = "esp32/dht11/humidity";
+const char* mqtt_topic_relay = "esp32/relay";
 
 DHT dht(DHTPIN, DHTTYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-void callback(char* topic, byte* payload, unsigned int length) {
-  // Aquí puedes manejar las respuestas recibidas del servidor MQTT
+bool relayState = false; // Variable para mantener el estado del relé
+
+void updateLCD() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("T: ");
+  lcd.print(dht.readTemperature());
+  lcd.print(" C");
+  lcd.setCursor(0, 1);
+  lcd.print("H: ");
+  lcd.print(dht.readHumidity());
+  lcd.print(" %");
+  lcd.setCursor(10, 1);
+  lcd.print("R: ");
+  lcd.print(relayState ? "ON" : "OFF");
 }
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  
+  if (strcmp(topic, mqtt_topic_relay) == 0) {
+    // Convertir payload en string
+    String message;
+    for (int i = 0; i < length; i++) {
+      message += (char)payload[i];
+    }
+
+    // Controlar el relé según el mensaje recibido
+    if (message.equals("OFF")) {
+      digitalWrite(RELAY_PIN, LOW);
+      relayState = true;
+      
+    } else if (message.equals("ON")) {
+      digitalWrite(RELAY_PIN, HIGH);
+      relayState = false;
+      updateLCD();
+    }
+  }
+}
+
 
 void reconnect() {
   while (!client.connected()) {
     Serial.print("Intentando conexión MQTT...");
     if (client.connect("ESP32Client")) {
       Serial.println("conectado!");
+      client.subscribe(mqtt_topic_relay);
     } else {
       Serial.print("Falló conexión, rc=");
       Serial.print(client.state());
@@ -56,6 +96,11 @@ void setup() {
   Serial.println(WiFi.localIP());
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+
+  lcd.init();
+  lcd.backlight();
+  pinMode(RELAY_PIN, OUTPUT);
+  updateLCD();
 }
 
 void loop() {
@@ -75,6 +120,7 @@ void loop() {
   Serial.print("Temperatura: ");
   Serial.print(temperature);
   Serial.println(" °C");
+  delay(5000);
   Serial.print("Humedad: ");
   Serial.print(humidity);
   Serial.println(" %");
@@ -84,8 +130,28 @@ void loop() {
   char humString[8];
   dtostrf(temperature, 4, 2, tempString);
   dtostrf(humidity, 4, 2, humString);
-  client.publish(mqtt_topic, tempString);
-  client.publish(mqtt_topic, humString);
+  client.publish(mqtt_topic_temp, tempString);
+  client.publish(mqtt_topic_hum, humString);
 
+  lcd.clear();
+
+  lcd.setCursor(0, 0);
+  lcd.print("T:");
+  lcd.print(temperature);
+  lcd.print("C");
+
+  lcd.setCursor(0, 1);
+  lcd.print("H: ");
+  lcd.print(humidity);
+  lcd.print("%");
+
+  lcd.setCursor(9, 1);
+  lcd.print("R:");
+  lcd.print(relayState ? "OFF" : "ON");
+
+  // Controlar el relé
+  digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
+
+  
   delay(2000);
 }
