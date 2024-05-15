@@ -4,6 +4,10 @@
 #define BLYNK_TEMPLATE_NAME "Dht11"
 #define BLYNK_AUTH_TOKEN "-pCgcQcxYonLH7RexMsHtH16yCDS0n3x"
 
+#define AWS_IOT_PUBLISH_TOPIC "esp32/dht11/temperature"
+#define AWS_IOT_PUBLISH_TOPIC "esp32/dht11/humidity"
+#define AWS_IOT_SUBSCRIBE_TOPIC "esp32/relay"
+
 #include <Arduino.h>
 #include <DHT.h>
 #include <Wire.h> 
@@ -15,16 +19,23 @@
 #include <DNSServer.h>
 #include <PubSubClient.h>
 #include <BlynkSimpleEsp32.h>
+#include <WiFiClientSecure.h>
+#include <ArduinoJson.h>
+#include <Secrets.h>
 
 
 #define DHTPIN 14
 #define DHTTYPE DHT11
 #define RELAY_PIN 26
 
-const char* ssid = "Red_IoT";
-const char* pass = "Rapsoda25";
+
+double humidity;
+double temperature;
+
+const char WIFI_SSID[] = "Red_IoT";               
+const char WIFI_PASSWORD[] = "Rapsoda25"; 
 const char* mqtt_server = "192.168.1.71";
-int mqtt_port = 1883;
+int mqtt_port = 1883, reload=true;
 const char* mqtt_topic_temp = "esp32/dht11/temperature";
 const char* mqtt_topic_hum = "esp32/dht11/humidity";
 const char* mqtt_topic_relay = "esp32/relay";
@@ -32,7 +43,8 @@ char auth[] = "-pCgcQcxYonLH7RexMsHtH16yCDS0n3x";
 
 DHT dht(DHTPIN, DHTTYPE);
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-WiFiClient espClient;
+
+WiFiClientSecure espClient = WiFiClientSecure();
 PubSubClient client(espClient);
 
 
@@ -56,10 +68,10 @@ void updateLCD() {
 BLYNK_WRITE(V1) {
   int value = param.asInt(); // Lee el estado del botón (1 o 0)
   if (value == 1) {
-    digitalWrite(RELAY_PIN, LOW); // Activa el relé
+    digitalWrite(RELAY_PIN, HIGH); 
     relayState = true;
   } else {
-    digitalWrite(RELAY_PIN, HIGH); // Desactiva el relé
+    digitalWrite(RELAY_PIN, LOW); 
     relayState = false;
   }
   updateLCD(); // Actualiza la pantalla LCD
@@ -75,13 +87,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
 
     // Controlar el relé según el mensaje recibido
-    if (message.equals("OFF")) {
+    if (message.equals("ON")) {
       digitalWrite(RELAY_PIN, LOW);
-      relayState = true;
-      
-    } else if (message.equals("ON")) {
-      digitalWrite(RELAY_PIN, HIGH);
       relayState = false;
+      
+    } else if (message.equals("OFF")) {
+      digitalWrite(RELAY_PIN, HIGH);
+      relayState = true;
       updateLCD();
     }
   }
@@ -92,20 +104,74 @@ void reconnect() {
     Serial.print("Intentando conexión MQTT...");
     if (client.connect("ESP32Client")) {
       Serial.println("conectado!");
-      client.subscribe(mqtt_topic_relay);
+      
     } else {
       Serial.print("Falló conexión, rc=");
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
       delay(5000);
     }
+      client.subscribe(mqtt_topic_relay);
   }
+}
+
+void messageHandler(char* topic, byte* payload, unsigned int length)
+{
+  Serial.print("incoming: ");
+  Serial.println(topic);
+ 
+  StaticJsonDocument<200> doc;
+  deserializeJson(doc, payload);
+  const char* message = doc["message"];
+  Serial.println(message);
+}
+
+void conexionaws(){
+
+  
+  espClient.setCACert(AWS_CERT_CA);
+  espClient.setCertificate(AWS_CERT_CRT);
+  espClient.setPrivateKey(AWS_CERT_PRIVATE);
+
+  client.setServer(AWS_IOT_ENDPOINT, 8883);
+
+  client.setCallback(messageHandler);
+ 
+  Serial.println("Connecting to AWS IOT");
+ 
+  while (!client.connect(THINGNAME))
+  {
+    Serial.print(".");
+    delay(100);
+  }
+ 
+  if (!client.connected())
+  {
+    Serial.println("AWS IoT Timeout!");
+    return;
+  }
+  client.subscribe(AWS_IOT_SUBSCRIBE_TOPIC);
+ 
+  Serial.println("AWS IoT Connected!");
+}
+
+ void publicarmensaje()
+{
+  StaticJsonDocument<200> doc;
+  doc["humidity"] = humidity;
+  doc["temperature"] = temperature;
+  char ON [512];
+  serializeJson(doc, ON); // print to client
+ 
+  client.publish(AWS_IOT_PUBLISH_TOPIC, ON);
 }
 
 void setup() {
   Serial.begin(9600);
   dht.begin();
-  WiFi.begin(ssid, pass);
+  conexionaws();
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(AWS_IOT_ENDPOINT, WIFI_PASSWORD);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
@@ -114,14 +180,13 @@ void setup() {
   Serial.println("WiFi conectado!");
   Serial.println("IP dinámica asignada: ");
   Serial.println(WiFi.localIP());
-  client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
 
   lcd.init();
   lcd.backlight();
   Blynk.connect();
   Blynk.config(auth);
-  Blynk.begin(auth, ssid, pass);
+  Blynk.begin(auth, AWS_IOT_ENDPOINT, WIFI_PASSWORD);
   pinMode(RELAY_PIN, OUTPUT);
   updateLCD();
 }
@@ -134,8 +199,8 @@ void loop() {
   }
   client.loop();
 
-  float temperature = dht.readTemperature();
-  float humidity = dht.readHumidity();
+  double temperature = dht.readTemperature();
+  double humidity = dht.readHumidity();
 
   if (isnan(temperature) || isnan(humidity)) {
     Serial.println("Error al leer el sensor DHT!");
@@ -176,10 +241,10 @@ void loop() {
 
   lcd.setCursor(9, 1);
   lcd.print("R:");
-  lcd.print(relayState ? "OFF" : "ON");
+  lcd.print(relayState ? "ON" : "OFF");
 
   // Controlar el relé
-  digitalWrite(RELAY_PIN, relayState ? HIGH : LOW);
+  digitalWrite(RELAY_PIN, relayState ? HIGH: LOW);
 
   
   delay(2000);
